@@ -1,0 +1,26 @@
+config:
+  phases:
+    - duration: 3
+      arrivalCount: 1
+
+scenarios:
+  - flow:
+      - post:
+          url: "{{ target }}"
+          json:
+            num: __NUM__
+          capture:
+            - json: "$.primes"
+              as: primes
+            - json: "$.num"
+              as: num
+            - json: "$.duration"
+              as: duration  
+          expect:
+            - statusCode: 200
+            - contentType: "application/json"
+      - log: |
+          Primes: {{ primes }},
+          Num: {{ num }},
+          Duration: {{ duration }}
+    name: "Sieve-of-Eratosthenes"
