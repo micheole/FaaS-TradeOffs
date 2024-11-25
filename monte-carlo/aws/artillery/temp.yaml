@@ -1,0 +1,26 @@
+config:
+  phases:
+    - duration: 5
+      arrivalCount: 1
+
+scenarios:
+  - flow:
+      - post:
+          url: "{{ target }}"
+          json:
+            trials: __TRIALS__
+          capture:
+            - json: "$.estimatedPi"
+              as: estimatedPi
+            - json: "$.trials"
+              as: trials
+            - json: "$.duration"
+              as: duration  
+          expect:
+            - statusCode: 200
+            - contentType: "application/json"
+      - log: |
+          Pi: {{ estimatedPi }},
+          Trials: {{ trials }},
+          Duration: {{ duration }}
+    name: "Monte Carlo"
