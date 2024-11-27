@@ -1,5 +1,7 @@
-exports.handler = async (event) => {
+exports.handler = async (event, context) => {
     let startTime = Date.now();
+ 
+    let uniqueId = context.awsRequestId;
 
     // Handle trials from both query parameters and request body
     const queryTrials = event.queryStringParameters && event.queryStringParameters.trials
@@ -36,9 +38,16 @@ exports.handler = async (event) => {
     let endTime = Date.now();
     let duration = endTime - startTime;
 
+    console.log(JSON.stringify({
+        uniqueId,
+        estimatedPi: pi,
+        trials,
+    }));
+
     return {
         statusCode: 200,
         body: JSON.stringify({
+            uniqueId: uniqueId,
             estimatedPi: pi,
             trials: trials,
             duration: duration
