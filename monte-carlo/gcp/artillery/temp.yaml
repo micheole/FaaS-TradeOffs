@@ -1,7 +1,7 @@
 config:
   phases:
-    - duration: 5
-      arrivalCount: 1
+    - duration: 100
+      arrivalCount: 60
 
 scenarios:
   - flow:
@@ -10,17 +10,17 @@ scenarios:
           json:
             trials: __TRIALS__
           capture:
+            - json: "$.traceId"
+              as: traceId
             - json: "$.estimatedPi"
               as: estimatedPi
             - json: "$.trials"
               as: trials
-            - json: "$.duration"
-              as: duration  
           expect:
             - statusCode: 200
             - contentType: "application/json"
       - log: |
+          Trace ID: {{ traceId }},
           Pi: {{ estimatedPi }},
-          Trials: {{ trials }},
-          Duration: {{ duration }}
+          Trials: {{ trials }}
     name: "Monte Carlo"

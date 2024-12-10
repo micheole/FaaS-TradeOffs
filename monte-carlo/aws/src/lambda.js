@@ -11,7 +11,6 @@ exports.handler = async (event, context) => {
         ? parseInt(body.trials, 10)
         : null;
 
-    // Use query parameter first, fallback to body, and default to 10,000 if invalid
     let trials = queryTrials || bodyTrials;
 
     let circle_points = 0;
