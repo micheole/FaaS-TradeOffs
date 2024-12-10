@@ -6,8 +6,6 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 
-# Get the URL and number of trials from the command-line arguments
-# URL=$1
 TRIALS=$1
 
 sed "s/__TRIALS__/$TRIALS/" temp.yaml > test.yaml
@@ -20,7 +18,7 @@ LOG_FILE_NAME="$LOG_DIR/aws-log-trials-$TRIALS-$(date +'%Y-%m-%d_%H-%M-%S').log"
 echo "Running with TRIALS=$TRIALS"
 
 START_TIME=$(date +%s)
-artillery run test.yaml -t "URL" | grep -E "Unique ID:|Pi:|Trials:" >> "$LOG_FILE_NAME" #CHANGE URL
+artillery run test.yaml -t "URL" | grep -E "Unique ID:|Pi:|Trials:" >> "$LOG_FILE_NAME.tmp" # REPLACE YOUR URL
 
 if [ $? -ne 0 ]; then
     echo "Artillery test failed. Check the logs in $LOG_FILE_NAME."
@@ -29,55 +27,53 @@ else
     echo "Artillery test completed. Logs saved to $LOG_FILE_NAME."
 fi
 
-echo "Waiting 5 minutes for CloudWatch logs to update..."
-sleep 300
+echo "Waiting 2 minutes for CloudWatch logs to update..."
+sleep 120
 
-# Extract all Request IDs from the Artillery output
-REQUEST_IDS=$(grep "Unique ID:" "$LOG_FILE_NAME" | awk -F "Unique ID: " '{print $2}' | tr -d ',')
-
-# Query CloudWatch logs for each Request ID
-echo "Querying CloudWatch logs for each Request ID..."
-AWS_REGION="eu-central-1" # Replace with your region
+AWS_REGION="eu-central-1"
 LOG_GROUP="/aws/lambda/..." # Replace with your Lambda function log group
 
-for ID in $REQUEST_IDS; do
-    echo "Processing Request ID: $ID"
-    
-    # Query CloudWatch logs for the specific Request ID
-    QUERY_ID=$(aws logs start-query \
-        --log-group-name "$LOG_GROUP" \
-        --query-string 'fields @message | filter @message like "REPORT"' \
-        --start-time "$START_TIME" \
-        --end-time $(date +%s) \
-        --region "$AWS_REGION" \
-        --output text)
-    
-    if [ -z "$QUERY_ID" ]; then
-        echo "Failed to start CloudWatch query for Request ID: $ID" >> "$LOG_FILE_NAME"
-        continue
+> "$LOG_FILE_NAME" # Clear final log file
+
+# Process each Request ID block and add the billed duration
+while read -r LINE; do
+    echo "$LINE" >> "$LOG_FILE_NAME" # Write the current line (Unique ID block) to the final log
+
+    if [[ "$LINE" == Unique\ ID:* ]]; then
+        REQUEST_ID=$(echo "$LINE" | awk -F "Unique ID: " '{print $2}' | tr -d ',')
+
+        # Query CloudWatch logs for the specific Request ID
+        QUERY_ID=$(aws logs start-query \
+            --log-group-name "$LOG_GROUP" \
+            --query-string "fields @message | filter @message like 'REPORT' and @message like '$REQUEST_ID'" \
+            --start-time "$START_TIME" \
+            --end-time $(date +%s) \
+            --region "$AWS_REGION" \
+            --output text)
+        
+        if [ -z "$QUERY_ID" ]; then
+            echo "Failed to start CloudWatch query for Request ID: $REQUEST_ID" >> "$LOG_FILE_NAME"
+            continue
+        fi
+
+        # Fetch query results
+        RESULT=$(aws logs get-query-results --query-id "$QUERY_ID" --region "$AWS_REGION")
+
+        # Extract Billed Duration
+        BILLED_DURATION=$(echo "$RESULT" | \
+            jq -r '.results[] | .[] | select(.field == "@message") | .value' | \
+            grep "Billed Duration" | awk -F "Billed Duration: " '{print $2}' | awk '{print $1}')
+        
+        if [ -n "$BILLED_DURATION" ]; then
+            echo "Billed Duration for Request $REQUEST_ID: $BILLED_DURATION ms" >> "$LOG_FILE_NAME"
+        else
+            echo "Billed Duration for Request $REQUEST_ID: Not Found" >> "$LOG_FILE_NAME"
+        fi
     fi
+done < "$LOG_FILE_NAME.tmp"
 
-    echo "Query_ID: $QUERY_ID"
-
-    # Wait for query to complete
-    echo "Waiting for query results..."
-    sleep 10
-
-    # Fetch query results
-    RESULT=$(aws logs get-query-results --query-id "$QUERY_ID" --region "$AWS_REGION")
-    echo "Result: $RESULT"
-
-    # Extract Billed Duration
-    BILLED_DURATION=$(echo "$RESULT" | \
-        jq -r '.results[] | .[] | select(.field == "@message") | .value' | \
-        grep "Billed Duration" | awk -F "Billed Duration: " '{print $2}' | awk '{print $1}')
-    
-    if [ -n "$BILLED_DURATION" ]; then
-        echo "Billed Duration: $BILLED_DURATION ms" >> "$LOG_FILE_NAME"
-    else
-        echo "Billed Duration: Not Found" >> "$LOG_FILE_NAME"
-    fi
-done
+# Remove the temporary file
+rm "$LOG_FILE_NAME.tmp"
 
 # Output the final log
 echo "Relevant details saved to $LOG_FILE_NAME."

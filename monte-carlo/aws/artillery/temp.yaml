@@ -1,7 +1,7 @@
 config:
   phases:
-    - duration: 5
-      arrivalCount: 3
+    - duration: 100
+      arrivalCount: 60
 
 scenarios:
   - flow:

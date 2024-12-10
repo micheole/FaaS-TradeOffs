@@ -1,6 +1,4 @@
 exports.handler = async (event, context) => {
-    let startTime = Date.now();
- 
     let uniqueId = context.awsRequestId;
 
     // Handle trials from both query parameters and request body
@@ -14,7 +12,7 @@ exports.handler = async (event, context) => {
         : null;
 
     // Use query parameter first, fallback to body, and default to 10,000 if invalid
-    let trials = queryTrials || bodyTrials || 10000;
+    let trials = queryTrials || bodyTrials;
 
     let circle_points = 0;
     let square_points = 0;
@@ -34,9 +32,6 @@ exports.handler = async (event, context) => {
     }
 
     let pi = (4 * circle_points) / square_points;
-    
-    let endTime = Date.now();
-    let duration = endTime - startTime;
 
     console.log(JSON.stringify({
         uniqueId,
@@ -49,8 +44,7 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
             uniqueId: uniqueId,
             estimatedPi: pi,
-            trials: trials,
-            duration: duration
+            trials: trials
         }),
         headers: {
             'Content-Type': 'application/json'
