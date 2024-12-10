@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "eu-central-1"
+  region = "eu-central-1" # REPLACE WITH YOUR REGION
 }
 
 data "aws_iam_policy_document" "assume_role" {
@@ -48,7 +48,7 @@ resource "aws_lambda_function" "lambda" {
 
   source_code_hash = data.archive_file.lambda.output_base64sha256
 
-  runtime = "nodejs18.x"
+  runtime = "nodejs20.x"
   handler = "lambda.handler"
 }
 
@@ -69,7 +69,7 @@ resource "aws_api_gateway_resource" "resource" {
 resource "aws_api_gateway_method" "method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.resource.id
-  http_method   = "POST"  # Change this to GET if you want to use a GET request
+  http_method   = "POST"
   authorization = "NONE"  # No authorization needed for public access
 }
 
@@ -78,7 +78,7 @@ resource "aws_api_gateway_integration" "integration" {
   rest_api_id             = aws_api_gateway_rest_api.api.id
   resource_id             = aws_api_gateway_resource.resource.id
   http_method             = aws_api_gateway_method.method.http_method
-  integration_http_method = "POST"  # Same as your method
+  integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.lambda.invoke_arn
 }
